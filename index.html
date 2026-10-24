@@ -65,11 +65,11 @@ h2{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
 <script>
 // минимальная защита: в коде только SHA-256 пароля; вход запоминается в браузере
 (function(){const H="73a2af8864fc500fa49048bf3003776c19938f360e56bd03663866fb3087884a",K="luna-auth",lock=document.getElementById("lock");
-  try{if(localStorage.getItem(K)===H){lock.hidden=true;return}}catch(e){}
+  try{if(localStorage.getItem(K)===H){lock.remove();return}}catch(e){}
   document.getElementById("lockForm").addEventListener("submit",async e=>{e.preventDefault();
     const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(document.getElementById("pw").value.trim()));
     const h=[...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
-    if(h===H){try{localStorage.setItem(K,H)}catch(e){}lock.hidden=true}else document.getElementById("pwErr").hidden=false})})();
+    if(h===H){try{localStorage.setItem(K,H)}catch(e){}lock.remove()}else document.getElementById("pwErr").hidden=false})})();
 </script>
 <canvas id="scene"></canvas>
 <div class="ctrls"><button id="zIn" title="Приблизить">+</button><button id="zOut" title="Отдалить">−</button><button id="zHome" title="Весь город">⌂</button></div>
