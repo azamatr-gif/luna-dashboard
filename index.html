@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Luna Chicago Live</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: 3D city fills the screen, a glass panel on the left holds KPIs, stores and today's shift. Single light look, chosen deliberately. */
+:root{
+  --bg:#eef0f3; --panel:rgba(255,255,255,.88); --ink:#1d2433; --muted:#6a7385;
+  --rose:#d6457a; --leaf:#3f9a6b; --line:#dde1e8; --warn:#e0912f;
+  --display:"Fraunces",Georgia,serif; --body:"Manrope",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+  color-scheme:light;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);overflow:hidden}
+#scene{position:fixed;inset:0;touch-action:none;cursor:grab}
+.ctrls{position:fixed;top:calc(16px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:6px;z-index:2}
+.ctrls button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:#fff;font:700 18px var(--body);color:var(--ink);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.ctrls button:hover{border-color:var(--rose)}
+.ctrls button:focus-visible{outline:2px solid var(--rose)}
+.panel{position:fixed;top:calc(16px + env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:320px;max-width:calc(100% - 32px);background:var(--panel);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:16px;overflow:auto}
+h1{font-family:var(--display);font-weight:600;font-size:24px;margin:0;line-height:1.1}
+.sub{color:var(--muted);font-size:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.demo{background:#fdecc8;color:#7a4b06;border-radius:999px;padding:2px 8px;font-weight:700;font-size:11px}
+.live{width:8px;height:8px;border-radius:50%;background:var(--leaf);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.3}}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kpi{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff}
+.kpi b{display:block;font-family:var(--mono);font-size:19px;font-variant-numeric:tabular-nums}
+.kpi span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.bar{height:6px;border-radius:3px;background:var(--line);margin-top:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--rose);transition:width .8s}
+h2{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 8px}
+.list{display:flex;flex-direction:column;gap:4px}
+.store{display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:center;padding:8px;border-radius:8px;cursor:pointer;border:1px solid transparent;background:none;font:inherit;color:inherit;text-align:left}
+.store:hover,.store.sel{background:#fff;border-color:var(--line)}
+.store:focus-visible{outline:2px solid var(--rose)}
+.dot{width:10px;height:10px;border-radius:50%}
+.store small{display:block;color:var(--muted);font-size:11px}
+.store b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px}
+.staff{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.person{display:flex;align-items:center;gap:8px}
+.av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700;flex:none}
+.person em{margin-left:auto;font-style:normal;font-size:11px;padding:2px 7px;border-radius:999px}
+.on{background:#dff2e7;color:#24704a}.br{background:#fbeccf;color:#8a5a12}.dl{background:#f9dbe6;color:#9c2a55}
+.feed{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px;align-items:flex-end;pointer-events:none}
+.toast{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.08);animation:in .4s ease}
+.toast b{font-family:var(--mono);color:var(--rose)}
+@keyframes in{from{transform:translateY(10px);opacity:0}}
+@media (max-width:640px){.panel{top:auto;height:46%;width:auto;right:max(16px,env(safe-area-inset-right,0px))}.feed{bottom:auto;top:calc(16px + env(safe-area-inset-top,0px));right:auto;left:max(16px,env(safe-area-inset-left,0px));align-items:flex-start}}
+@media (prefers-reduced-motion:reduce){.live,.toast{animation:none}}
+</style>
+
+<canvas id="scene"></canvas>
+<div class="ctrls"><button id="zIn" title="Приблизить">+</button><button id="zOut" title="Отдалить">−</button><button id="zHome" title="Весь город">⌂</button></div>
+<aside class="panel">
+  <div>
+    <h1>Luna Flowers · Chicago</h1>
+    <div class="sub"><span class="live"></span><span id="clock">—</span><span class="demo">ДЕМО-ДАННЫЕ</span></div>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><span>Выручка сегодня</span><b id="kRev">$0</b><div class="bar"><i id="kPlan" style="width:0"></i></div></div>
+    <div class="kpi"><span>Заказов</span><b id="kOrd">0</b></div>
+    <div class="kpi"><span>Средний чек</span><b id="kAvg">$0</b></div>
+    <div class="kpi"><span>На смене</span><b id="kStaff">0</b></div>
+  </div>
+  <div><h2>Магазины · клик — фокус на карте</h2><div class="list" id="stores"></div></div>
+  <div><h2 id="staffTitle">Сегодня работают</h2><div class="staff" id="staff"></div></div>
+</aside>
+<div class="feed" id="feed"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ===== ДАННЫЕ (демо). Позже заменить на загрузку из Google-таблицы / JSON =====
+const P=(lat,lon)=>[(lon+87.82)*82.7,-(lat-42.0)*111]; // широта/долгота → км на карте
+const DATA={
+  plan:9000,
+  stores:[
+    {id:"lv",name:"Shop 1",addr:"Чикаго",lat:41.946,lon:-87.652,color:"#d6457a",rev:2410,orders:34,ly:3.6},
+    {id:"lp",name:"Shop 2",addr:"Чикаго",lat:41.969,lon:-87.686,color:"#7b5cd6",rev:1980,orders:27,ly:5.6},
+    {id:"df",name:"Shop 3",addr:"Пригород",lat:42.171,lon:-87.845,color:"#3f9a6b",rev:1460,orders:19,ly:4.5},
+    {id:"sb",name:"Shop 4",addr:"Пригород",lat:42.033,lon:-88.083,color:"#e0912f",rev:1720,orders:23,ly:4.5}
+  ],
+  staff:[
+    {name:"Aigerim",role:"Флорист",store:"lv",st:"on"},{name:"Maria",role:"Флорист",store:"lv",st:"br"},
+    {name:"Daniel",role:"Флорист",store:"lp",st:"on"},{name:"Sofia",role:"Флорист",store:"df",st:"on"},
+    {name:"Timur",role:"Курьер",store:"df",st:"dl"},{name:"Olivia",role:"Флорист",store:"sb",st:"on"},
+    {name:"Ruslan",role:"Курьер",store:"lv",st:"dl"},{name:"Grace",role:"Флорист",store:"sb",st:"on"}
+  ]
+};
+DATA.stores.forEach(s=>{[s.x,s.z]=P(s.lat,s.lon)});
+const ST={on:"на смене",br:"перерыв",dl:"доставка"};
+const byId=Object.fromEntries(DATA.stores.map(s=>[s.id,s]));
+const $=id=>document.getElementById(id);
+const money=n=>"$"+Math.round(n).toLocaleString("en-US");
+let selected=null;
+
+// ===== 3D СЦЕНА =====
+const canvas=$("scene");
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+const scene=new THREE.Scene();
+scene.background=new THREE.Color("#eef0f3");
+const cam=new THREE.OrthographicCamera(-1,1,1,-1,0.1,500);
+scene.add(new THREE.HemisphereLight("#ffffff","#c9ced8",0.75));
+const sun=new THREE.DirectionalLight("#ffffff",0.7);
+sun.position.set(30,50,20);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-75,right:75,top:75,bottom:-75});
+scene.add(sun);
+const M=c=>new THREE.MeshLambertMaterial({color:c});
+const box=(w,h,d,c,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),M(c));m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;scene.add(m);return m};
+
+// карта: очертание Чикаго, озеро Мичиган, хайвеи, пригороды (реальные координаты, 1 ед. ≈ 1 км)
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const pts=a=>a.map(([la,lo])=>P(la,lo));
+const ground=box(170,0.2,170,"#f2f4f1",0,-0.1,0);
+function flat(p,color,y){const s=new THREE.Shape();p.forEach(([x,z],i)=>i?s.lineTo(x,-z):s.moveTo(x,-z));
+  const m=new THREE.Mesh(new THREE.ShapeGeometry(s),M(color));m.rotation.x=-Math.PI/2;m.position.y=y;m.receiveShadow=true;scene.add(m);return m}
+const inside=(p,[x,z])=>{let c=false;for(let i=0,j=p.length-1;i<p.length;j=i++){const[xi,zi]=p[i],[xj,zj]=p[j];if((zi>z)!==(zj>z)&&x<(xj-xi)*(z-zi)/(zj-zi)+xi)c=!c}return c};
+const SHORE=[[42.40,-87.80],[42.30,-87.81],[42.25,-87.82],[42.20,-87.79],[42.15,-87.75],[42.10,-87.70],[42.06,-87.675],[42.02,-87.668],[42.00,-87.66],[41.97,-87.645],[41.93,-87.632],[41.90,-87.62],[41.88,-87.615],[41.85,-87.61],[41.80,-87.58],[41.76,-87.56],[41.70,-87.53],[41.55,-87.50]];
+const LAKE=pts([...SHORE,[41.55,-86.9],[42.40,-86.9]]);
+const CITY=pts([[42.02,-87.668],[42.02,-87.71],[42.00,-87.81],[41.99,-87.94],[41.96,-87.94],[41.97,-87.81],[41.91,-87.80],[41.83,-87.80],[41.74,-87.74],[41.69,-87.68],[41.64,-87.62],[41.64,-87.53],[41.70,-87.53],[41.76,-87.56],[41.80,-87.58],[41.85,-87.61],[41.88,-87.615],[41.90,-87.62],[41.93,-87.632],[41.97,-87.645],[42.00,-87.66]]);
+flat(LAKE,"#b9d4ea",0.03);flat(CITY,"#e6e9ef",0.02);
+scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([...CITY,CITY[0]].map(([x,z])=>new THREE.Vector3(x,0.06,z))),new THREE.LineBasicMaterial({color:"#9aa3b5"})));
+// хайвеи: I-90 (Kennedy/Jane Addams), I-94 (Edens), I-294, I-290, Dan Ryan
+const ROADS=[[[41.875,-87.64],[41.97,-87.76],[41.98,-87.90],[42.04,-88.05],[42.06,-88.25]],[[41.97,-87.76],[42.05,-87.75],[42.15,-87.82],[42.18,-87.86],[42.32,-87.88]],[[41.75,-87.88],[41.98,-87.89],[42.10,-87.87],[42.20,-87.89]],[[41.875,-87.64],[41.87,-87.80],[41.88,-87.95],[41.99,-88.03],[42.03,-88.07]],[[41.875,-87.64],[41.75,-87.63],[41.60,-87.62]]];
+ROADS.forEach(r=>{const p=pts(r);for(let i=1;i<p.length;i++){const[x1,z1]=p[i-1],[x2,z2]=p[i];const L=Math.hypot(x2-x1,z2-z1);
+  const m=new THREE.Mesh(new THREE.BoxGeometry(L,0.05,0.45),M("#cfd5df"));m.position.set((x1+x2)/2,0.07,(z1+z2)/2);m.rotation.y=-Math.atan2(z2-z1,x2-x1);scene.add(m)}});
+// застройка: небоскрёбы Loop, город, пригороды с деревьями
+const LOOP=P(41.882,-87.630);
+for(let i=0;i<45;i++){const a=rnd(0,6.28),r=Math.sqrt(Math.random())*2.6,x=LOOP[0]+Math.cos(a)*r,z=LOOP[1]+Math.sin(a)*r;
+  if(inside(LAKE,[x,z]))continue;const h=rnd(1.5,8)*(1-r/4),w=rnd(.4,.8);box(w,h,w,"#ffffff",x,h/2,z)}
+for(let i=0;i<500;i++){const x=rnd(-10,25),z=rnd(-3,45);if(!inside(CITY,[x,z])||Math.hypot(x-LOOP[0],z-LOOP[1])<2.8)continue;
+  if(DATA.stores.some(s=>Math.hypot(s.x-x,s.z-z)<2))continue;const h=rnd(.2,.8);box(rnd(.4,.8),h,rnd(.4,.8),"#fbfbfd",x,h/2,z)}
+for(let i=0;i<500;i++){const x=rnd(-55,30),z=rnd(-45,45);if(inside(CITY,[x,z])||inside(LAKE,[x,z])||DATA.stores.some(s=>Math.hypot(s.x-x,s.z-z)<2.5))continue;
+  if(Math.random()<.45){const h=rnd(.2,.5);box(rnd(.4,.7),h,rnd(.4,.7),"#ffffff",x,h/2,z)}
+  else{const t=new THREE.Mesh(new THREE.SphereGeometry(rnd(.3,.55),8,6),M("#9fd3aa"));t.position.set(x,.45,z);t.castShadow=true;scene.add(t)}}
+// подписи на карте
+function label(text,x,z,y,o={}){const c=document.createElement("canvas");c.width=512;c.height=96;const g=c.getContext("2d");
+  g.font=`${o.weight||600} ${o.px||44}px Manrope, system-ui, sans-serif`;g.textAlign="center";g.textBaseline="middle";
+  if(o.bg){const w=g.measureText(text).width+40;g.fillStyle=o.bg;g.beginPath();g.roundRect?g.roundRect(256-w/2,14,w,68,34):g.rect(256-w/2,14,w,68);g.fill()}
+  g.fillStyle=o.color||"#6a7385";g.fillText(text,256,50);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));
+  const k=o.k||2.6;s.scale.set(k*5.33,k,1);s.position.set(x,y,z);s.renderOrder=10;scene.add(s);return s}
+[["Lake Michigan",42.02,-87.50,"#5c86ad"],["CHICAGO",41.80,-87.70],["The Loop",41.875,-87.63],["O'Hare",41.978,-87.905],["Evanston",42.045,-87.70]].forEach(([t,la,lo,c])=>{const[x,z]=P(la,lo);label(t,x,z,1,{color:c,k:t==="CHICAGO"?4:2.6,weight:t==="CHICAGO"?700:600})});
+
+// магазины: здание + розовый навес + столбик выручки + пин
+const storeObjs={};
+DATA.stores.forEach(s=>{
+  const g=new THREE.Group();g.position.set(s.x,0,s.z);g.scale.setScalar(0.55);scene.add(g);
+  label(s.name,s.x,s.z,s.ly,{bg:"#ffffff",color:s.color,k:2.4,weight:700});
+  const b=new THREE.Mesh(new THREE.BoxGeometry(5,2.6,4),M("#ffffff"));b.position.y=1.3;b.castShadow=b.receiveShadow=true;g.add(b);
+  const aw=new THREE.Mesh(new THREE.BoxGeometry(5.2,0.3,1.2),M(s.color));aw.position.set(0,2,2.4);g.add(aw);
+  const roof=new THREE.Mesh(new THREE.BoxGeometry(5,0.2,4),M(s.color));roof.position.y=2.7;g.add(roof);
+  const bar=new THREE.Mesh(new THREE.CylinderGeometry(1,1,0.08,48),new THREE.MeshLambertMaterial({color:s.color,transparent:true,opacity:.3}));
+  bar.position.set(0,0.06,0);g.add(bar); // круг на земле: чем больше выручка, тем шире
+  const pin=new THREE.Mesh(new THREE.SphereGeometry(0.55,16,12),M(s.color));g.add(pin);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(3.4,3.8,40),new THREE.MeshBasicMaterial({color:s.color,transparent:true,opacity:0}));
+  ring.rotation.x=-Math.PI/2;ring.position.y=0.05;g.add(ring);
+  storeObjs[s.id]={g,bar,pin,ring,h:1,body:b};
+});
+
+// сотрудники — фигурки у своих магазинов; курьеры — фургоны
+const people=[],vans=[];
+DATA.staff.forEach((p,i)=>{const s=byId[p.store];
+  if(p.st==="dl"){const v=new THREE.Group();const c=new THREE.Mesh(new THREE.BoxGeometry(1.8,1,1),M("#ffffff"));c.position.y=.7;c.castShadow=true;v.add(c);
+    const stripe=new THREE.Mesh(new THREE.BoxGeometry(1.82,.2,1.02),M(s.color));stripe.position.y=.75;v.add(stripe);
+    v.scale.setScalar(.7);scene.add(v);vans.push({v,s,t:Math.random()*10,r:rnd(3,6)});return}
+  const f=new THREE.Group();const body=new THREE.Mesh(new THREE.CylinderGeometry(.25,.32,.8,10),M(p.st==="br"?"#e0b46a":s.color));body.position.y=.4;
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),M("#f2d2b6"));head.position.y=1;f.add(body,head);
+  f.children.forEach(c=>c.castShadow=true);f.scale.setScalar(.6);scene.add(f);people.push({f,s,a:i*1.7,st:p.st})});
+
+// события: клиент заходит в магазин → Order; поставщик подъезжает → Invoice
+const fx=[];let orderNo=0,invoiceNo=0;
+function bubble(text,s,color){const sp=label(text,s.x,s.z,3.2,{bg:color,color:"#ffffff",k:2.4,px:30,weight:700});sp.material.opacity=0;fx.push({sp,t:0,y:3.2})}
+function figure(color){const f=new THREE.Group();const b=new THREE.Mesh(new THREE.CylinderGeometry(.25,.32,.8,10),M(color));b.position.y=.4;
+  const h=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),M("#f2d2b6"));h.position.y=1;f.add(b,h);f.scale.setScalar(.6);scene.add(f);return f}
+function walker(s,amt){const f=figure("#2f3a52"),a=rnd(0,6.28);
+  fx.push({walk:f,from:[s.x+Math.cos(a)*3.5,s.z+Math.sin(a)*3.5],to:[s.x,s.z],t:0,dur:3,done:()=>{scene.remove(f);completeOrder(s,amt)}})}
+function truck(s,amt){const v=new THREE.Group();const c=new THREE.Mesh(new THREE.BoxGeometry(2.2,1.3,1.1),M("#ffffff"));c.position.y=.85;
+  const cab=new THREE.Mesh(new THREE.BoxGeometry(.8,1,1.1),M("#2f3a52"));cab.position.set(1.4,.7,0);v.add(c,cab);v.children.forEach(m=>m.castShadow=true);v.scale.setScalar(.8);scene.add(v);
+  const a=rnd(0,6.28),from=[s.x+Math.cos(a)*14,s.z+Math.sin(a)*14],to=[s.x+Math.cos(a)*1.8,s.z+Math.sin(a)*1.8];
+  v.rotation.y=-Math.atan2(to[1]-from[1],to[0]-from[0]);
+  fx.push({walk:v,from,to,t:0,dur:5,done:()=>{invoiceNo++;const sup="Supplier "+(1+Math.floor(Math.random()*3));
+    bubble(`${sup} · Invoice ${invoiceNo} · ${money(amt)}`,s,"#2f3a52");toast(`${sup} → ${s.name} · Invoice ${invoiceNo} · <b>${money(amt)}</b>`);
+    v.rotation.y+=Math.PI;fx.push({walk:v,from:to,to:from,t:-3,dur:5,done:()=>scene.remove(v)})}})}
+
+// камера: изометрия с медленным облётом
+let angle=1.9,target=new THREE.Vector3(-3,0,-2),zoom=62,baseZoom=62,lastTouch=0,moved=0;
+// управление: колесо/щипок — зум, перетаскивание — поворот, кнопки +/−/⌂
+const setZoom=z=>{baseZoom=Math.max(8,Math.min(120,z));lastTouch=Date.now()};
+canvas.addEventListener("wheel",e=>{e.preventDefault();setZoom(baseZoom*(e.deltaY>0?1.1:0.9))},{passive:false});
+const ptrs=new Map();let pinch=0;
+canvas.addEventListener("pointerdown",e=>{canvas.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;canvas.style.cursor="grabbing"});
+canvas.addEventListener("pointermove",e=>{const p=ptrs.get(e.pointerId);if(!p)return;
+  if(ptrs.size===2){const [a,b]=[...ptrs.values()];const d0=Math.hypot(a.x-b.x,a.y-b.y);p.x=e.clientX;p.y=e.clientY;const d1=Math.hypot(a.x-b.x,a.y-b.y);if(d0)setZoom(baseZoom*d0/d1);moved+=10;return}
+  const dx=e.clientX-p.x;angle+=dx*0.006;moved+=Math.abs(dx)+Math.abs(e.clientY-p.y);p.x=e.clientX;p.y=e.clientY;lastTouch=Date.now()});
+const up=e=>{ptrs.delete(e.pointerId);canvas.style.cursor="grab"};
+canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);
+$("zIn").onclick=()=>setZoom(baseZoom*0.75);$("zOut").onclick=()=>setZoom(baseZoom/0.75);
+$("zHome").onclick=()=>{selected=null;baseZoom=62;lastTouch=0;render()};
+function resize(){const w=innerWidth,h=innerHeight,a=w/h;renderer.setSize(w,h,false);
+  const z=w<640?zoom*1.25:zoom;Object.assign(cam,{left:-z*a/2,right:z*a/2,top:z/2,bottom:-z/2});cam.updateProjectionMatrix()}
+addEventListener("resize",resize);resize();
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// клики по магазинам в 3D
+const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();
+canvas.addEventListener("click",e=>{if(moved>6)return;mouse.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);ray.setFromCamera(mouse,cam);
+  const hit=ray.intersectObjects(Object.values(storeObjs).map(o=>o.g),true)[0];
+  if(hit){const id=Object.keys(storeObjs).find(k=>{let o=hit.object;while(o){if(o===storeObjs[k].g)return true;o=o.parent}});select(id)}});
+
+const clock=new THREE.Clock();
+function frame(){const dt=clock.getDelta(),t=clock.elapsedTime;
+  if(!reduce&&!ptrs.size&&Date.now()-lastTouch>8000)angle+=dt*0.04;
+  const tg=selected?new THREE.Vector3(byId[selected].x,0,byId[selected].z):new THREE.Vector3(-3,0,-2);
+  target.lerp(tg,0.04);zoom+=((selected?Math.min(baseZoom,16):baseZoom)-zoom)*0.15;resize();
+  cam.position.set(target.x+Math.cos(angle)*60,48,target.z+Math.sin(angle)*60);cam.lookAt(target);
+  const max=Math.max(...DATA.stores.map(s=>s.rev));
+  DATA.stores.forEach(s=>{const o=storeObjs[s.id];const h=1.5+s.rev/max*3;o.h+=(h-o.h)*0.05;
+    o.bar.scale.set(o.h,1,o.h);o.pin.position.set(0,4+Math.sin(t*2+s.x)*0.25,0);
+    o.ring.material.opacity=selected===s.id?0.6+Math.sin(t*4)*0.3:Math.max(0,o.ring.material.opacity-dt)});
+  people.forEach(p=>{const a=p.a+(p.st==="on"&&!reduce?t*0.4:0);p.f.position.set(p.s.x+Math.cos(a)*1.9,0,p.s.z+Math.sin(a)*1.9+0.3)});
+  vans.forEach(v=>{const a=v.t+(reduce?0:t*0.25);const x=v.s.x+Math.cos(a)*v.r,z=v.s.z+Math.sin(a)*v.r*0.7;
+    v.v.position.set(x,0,z);v.v.rotation.y=-Math.atan2(Math.cos(a)*v.r*0.7,-Math.sin(a)*v.r)});
+  for(let i=fx.length-1;i>=0;i--){const e=fx[i];e.t+=dt;
+    if(e.walk){if(e.t<0)continue;const k=Math.min(1,e.t/e.dur);e.walk.position.set(e.from[0]+(e.to[0]-e.from[0])*k,0,e.from[1]+(e.to[1]-e.from[1])*k);if(k>=1){fx.splice(i,1);e.done()}}
+    else{e.sp.position.y=e.y+e.t*0.5;e.sp.material.opacity=e.t<0.4?e.t/0.4:e.t>4?Math.max(0,5-e.t):1;if(e.t>5){scene.remove(e.sp);fx.splice(i,1)}}}
+  renderer.render(scene,cam);requestAnimationFrame(frame)}
+frame();
+
+// ===== ПАНЕЛЬ =====
+function render(){
+  const rev=DATA.stores.reduce((a,s)=>a+s.rev,0),ord=DATA.stores.reduce((a,s)=>a+s.orders,0);
+  $("kRev").textContent=money(rev);$("kOrd").textContent=ord;$("kAvg").textContent=money(rev/ord);
+  $("kPlan").style.width=Math.min(100,rev/DATA.plan*100)+"%";
+  $("kStaff").textContent=DATA.staff.filter(p=>p.st!=="br").length+" / "+DATA.staff.length;
+  const sorted=[...DATA.stores].sort((a,b)=>b.rev-a.rev);
+  $("stores").innerHTML=sorted.map(s=>`<button class="store${selected===s.id?" sel":""}" data-id="${s.id}"><span class="dot" style="background:${s.color}"></span><span>${s.name}<small>${s.addr} · ${s.orders} заказов</small></span><b>${money(s.rev)}</b></button>`).join("");
+  const list=selected?DATA.staff.filter(p=>p.store===selected):DATA.staff;
+  $("staffTitle").textContent=selected?"Смена · "+byId[selected].name:"Сегодня работают";
+  $("staff").innerHTML=list.map(p=>`<div class="person"><span class="av" style="background:${byId[p.store].color}">${p.name[0]}</span><span>${p.name} <small style="color:var(--muted)">${p.role} · ${byId[p.store].name}</small></span><em class="${p.st==="on"?"on":p.st==="br"?"br":"dl"}">${ST[p.st]}</em></div>`).join("");
+}
+function select(id){selected=selected===id?null:id;render()}
+$("stores").addEventListener("click",e=>{const b=e.target.closest(".store");if(b)select(b.dataset.id)});
+
+// симуляция новых продаж (в реальной версии — опрос таблицы раз в N минут)
+function toast(html){const el=document.createElement("div");el.className="toast";el.innerHTML=html;
+  $("feed").prepend(el);while($("feed").children.length>3)$("feed").lastChild.remove();setTimeout(()=>el.remove(),6000)}
+function completeOrder(s,amt){s.rev+=amt;s.orders++;orderNo++;render();
+  bubble(`Order ${orderNo} · ${money(amt)}`,s,s.color);toast(`Order ${orderNo} · ${s.name} · <b>+${money(amt)}</b>`)}
+const pick=()=>DATA.stores[Math.floor(Math.random()*DATA.stores.length)];
+function sale(){walker(pick(),Math.round(rnd(35,160)));setTimeout(sale,rnd(4000,8000))}
+function supply(){truck(pick(),Math.round(rnd(6,15))*100);setTimeout(supply,rnd(12000,20000))}
+setTimeout(sale,1500);setTimeout(supply,5000);
+function tick(){$("clock").textContent="Chicago · "+new Date().toLocaleTimeString("ru-RU",{timeZone:"America/Chicago",hour:"2-digit",minute:"2-digit"})}
+tick();setInterval(tick,10000);render();
+</script>
