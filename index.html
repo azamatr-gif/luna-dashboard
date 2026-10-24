@@ -184,12 +184,18 @@ DATA.stores.forEach(s=>{
 // сотрудники — фигурки у своих магазинов; курьеры — фургоны
 const people=[],vans=[];
 DATA.staff.forEach((p,i)=>{const s=byId[p.store];
-  if(p.st==="dl"){const v=new THREE.Group();const c=new THREE.Mesh(new THREE.BoxGeometry(1.8,1,1),M("#ffffff"));c.position.y=.7;c.castShadow=true;v.add(c);
-    const stripe=new THREE.Mesh(new THREE.BoxGeometry(1.82,.2,1.02),M(s.color));stripe.position.y=.75;v.add(stripe);
-    v.scale.setScalar(.7);scene.add(v);vans.push({v,s,t:Math.random()*10,r:rnd(3,6)});return}
+  if(p.st==="dl")return; // курьеры — в фиолетовых машинах ниже
   const f=new THREE.Group();const body=new THREE.Mesh(new THREE.CylinderGeometry(.25,.32,.8,10),M(p.st==="br"?"#e0b46a":s.color));body.position.y=.4;
   const head=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),M("#f2d2b6"));head.position.y=1;f.add(body,head);
   f.children.forEach(c=>c.castShadow=true);f.scale.setScalar(.6);scene.add(f);people.push({f,s,a:i*1.7,st:p.st})});
+// доставка: фиолетовые седаны выезжают из магазина к клиенту и возвращаются
+function sedan(){const v=new THREE.Group(),C="#6a3fa5";
+  const body=new THREE.Mesh(new THREE.BoxGeometry(2,.5,.95),M(C));body.position.y=.45;
+  const cab=new THREE.Mesh(new THREE.BoxGeometry(1.05,.42,.85),M(C));cab.position.set(-.1,.9,0);
+  const glass=new THREE.Mesh(new THREE.BoxGeometry(1.08,.24,.87),M("#cfd8ea"));glass.position.set(-.1,.93,0);v.add(body,cab,glass);
+  [[.62,.47],[.62,-.47],[-.62,.47],[-.62,-.47]].forEach(([x,z])=>{const w=new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,.12,12),M("#222428"));w.rotation.x=Math.PI/2;w.position.set(x,.2,z);v.add(w)});
+  v.children.forEach(m=>m.castShadow=true);v.scale.setScalar(.6);scene.add(v);return v}
+DATA.stores.forEach(s=>{for(let k=0;k<2;k++)vans.push({v:sedan(),s,a:rnd(0,6.28),r:rnd(3,7),t:rnd(0,1),sp:rnd(.05,.09),trip:-1})});
 
 // события: клиент заходит в магазин → Order; поставщик подъезжает → Invoice
 const fx=[];let orderNo=0,invoiceNo=0;
@@ -246,8 +252,10 @@ function frame(){const dt=clock.getDelta(),t=clock.elapsedTime;
     o.bar.scale.set(o.h,1,o.h);o.pin.position.set(0,4+Math.sin(t*2+s.x)*0.25,0);
     o.ring.material.opacity=selected===s.id?0.6+Math.sin(t*4)*0.3:Math.max(0,o.ring.material.opacity-dt)});
   people.forEach(p=>{const a=p.a+(p.st==="on"&&!reduce?t*0.4:0);p.f.position.set(p.s.x+Math.cos(a)*1.9,0,p.s.z+Math.sin(a)*1.9+0.3)});
-  vans.forEach(v=>{const a=v.t+(reduce?0:t*0.25);const x=v.s.x+Math.cos(a)*v.r,z=v.s.z+Math.sin(a)*v.r*0.7;
-    v.v.position.set(x,0,z);v.v.rotation.y=-Math.atan2(Math.cos(a)*v.r*0.7,-Math.sin(a)*v.r)});
+  vans.forEach(v=>{const T=v.t+(reduce?0:t*v.sp),trip=Math.floor(T),ph=T-trip;
+    if(trip!==v.trip){v.trip=trip;v.a=rnd(0,6.28);v.r=rnd(3,7)} // новый адрес на каждую поездку
+    const out=ph<.45,k=out?ph/.45:ph<.55?1:1-(ph-.55)/.45,d=.8+k*v.r;
+    v.v.position.set(v.s.x+Math.cos(v.a)*d,0,v.s.z+Math.sin(v.a)*d);v.v.rotation.y=-v.a+(out?0:Math.PI)});
   for(let i=fx.length-1;i>=0;i--){const e=fx[i];e.t+=dt;
     if(e.walk){if(e.t<0)continue;const k=Math.min(1,e.t/e.dur);e.walk.position.set(e.from[0]+(e.to[0]-e.from[0])*k,0,e.from[1]+(e.to[1]-e.from[1])*k);if(k>=1){fx.splice(i,1);e.done()}}
     else{e.sp.position.y=e.y+e.t*0.5;e.sp.material.opacity=e.t<0.4?e.t/0.4:e.t>4?Math.max(0,5-e.t):1;if(e.t>5){scene.remove(e.sp);fx.splice(i,1)}}}
