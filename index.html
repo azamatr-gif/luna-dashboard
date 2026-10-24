@@ -96,16 +96,15 @@ const P=(lat,lon)=>[(lon+87.82)*82.7,-(lat-42.0)*111]; // широта/долг�
 const DATA={
   plan:9000,
   stores:[
-    {id:"lv",name:"Shop 1",addr:"Чикаго",lat:41.946,lon:-87.652,color:"#d6457a",rev:2410,orders:34,ly:3.6},
-    {id:"lp",name:"Shop 2",addr:"Чикаго",lat:41.969,lon:-87.686,color:"#7b5cd6",rev:1980,orders:27,ly:5.6},
-    {id:"df",name:"Shop 3",addr:"Пригород",lat:42.171,lon:-87.845,color:"#3f9a6b",rev:1460,orders:19,ly:4.5},
-    {id:"sb",name:"Shop 4",addr:"Пригород",lat:42.033,lon:-88.083,color:"#e0912f",rev:1720,orders:23,ly:4.5}
+    {id:"lv",name:"Lakeview",addr:"Lakeview, Chicago",lat:41.946,lon:-87.652,color:"#d6457a",rev:2410,orders:34,ly:4.6},
+    {id:"lp",name:"Lincoln Square",addr:"Lincoln Square, Chicago",lat:41.969,lon:-87.686,color:"#7b5cd6",rev:1980,orders:27,ly:6.6},
+    {id:"df",name:"Deerfield",addr:"Deerfield, IL",lat:42.171,lon:-87.845,color:"#3f9a6b",rev:1460,orders:19,ly:4.5},
+    {id:"sb",name:"Schaumburg",addr:"Schaumburg, IL",lat:42.033,lon:-88.083,color:"#e0912f",rev:1720,orders:23,ly:4.5}
   ],
   staff:[
-    {name:"Aigerim",role:"Флорист",store:"lv",st:"on"},{name:"Maria",role:"Флорист",store:"lv",st:"br"},
-    {name:"Daniel",role:"Флорист",store:"lp",st:"on"},{name:"Sofia",role:"Флорист",store:"df",st:"on"},
-    {name:"Timur",role:"Курьер",store:"df",st:"dl"},{name:"Olivia",role:"Флорист",store:"sb",st:"on"},
-    {name:"Ruslan",role:"Курьер",store:"lv",st:"dl"},{name:"Grace",role:"Флорист",store:"sb",st:"on"}
+    {name:"Karina",role:"Флорист",store:"lv",st:"on",roof:true},{name:"Milana",role:"Флорист",store:"lp",st:"on",roof:true},
+    {name:"Gina",role:"Флорист",store:"df",st:"on",roof:true},{name:"Meka",role:"Флорист",store:"sb",st:"on",roof:true},
+    {name:"Timur",role:"Курьер",store:"df",st:"dl"},{name:"Ruslan",role:"Курьер",store:"lv",st:"dl"}
   ]
 };
 DATA.stores.forEach(s=>{[s.x,s.z]=P(s.lat,s.lon)});
@@ -170,12 +169,16 @@ const storeObjs={};
 DATA.stores.forEach(s=>{
   const g=new THREE.Group();g.position.set(s.x,0,s.z);g.scale.setScalar(0.55);scene.add(g);
   label(s.name,s.x,s.z,s.ly,{bg:"#ffffff",color:s.color,k:2.4,weight:700});
+  // флорист на крыше + имя
+  const fl=DATA.staff.find(p=>p.roof&&p.store===s.id);
+  if(fl){const f=figure(s.color);scene.remove(f);f.scale.setScalar(1.4);f.position.set(0,2.8,0);g.add(f);
+    label(fl.name,s.x,s.z,2.9,{bg:s.color,color:"#ffffff",k:1.5,weight:700})}
   const b=new THREE.Mesh(new THREE.BoxGeometry(5,2.6,4),M("#ffffff"));b.position.y=1.3;b.castShadow=b.receiveShadow=true;g.add(b);
   const aw=new THREE.Mesh(new THREE.BoxGeometry(5.2,0.3,1.2),M(s.color));aw.position.set(0,2,2.4);g.add(aw);
   const roof=new THREE.Mesh(new THREE.BoxGeometry(5,0.2,4),M(s.color));roof.position.y=2.7;g.add(roof);
   const bar=new THREE.Mesh(new THREE.CylinderGeometry(1,1,0.08,48),new THREE.MeshLambertMaterial({color:s.color,transparent:true,opacity:.3}));
   bar.position.set(0,0.06,0);g.add(bar); // круг на земле: чем больше выручка, тем шире
-  const pin=new THREE.Mesh(new THREE.SphereGeometry(0.55,16,12),M(s.color));g.add(pin);
+  const pin=new THREE.Mesh(new THREE.SphereGeometry(0.55,16,12),M(s.color));pin.visible=false;g.add(pin);
   const ring=new THREE.Mesh(new THREE.RingGeometry(3.4,3.8,40),new THREE.MeshBasicMaterial({color:s.color,transparent:true,opacity:0}));
   ring.rotation.x=-Math.PI/2;ring.position.y=0.05;g.add(ring);
   storeObjs[s.id]={g,bar,pin,ring,h:1,body:b};
@@ -184,7 +187,7 @@ DATA.stores.forEach(s=>{
 // сотрудники — фигурки у своих магазинов; курьеры — фургоны
 const people=[],vans=[];
 DATA.staff.forEach((p,i)=>{const s=byId[p.store];
-  if(p.st==="dl")return; // курьеры — в фиолетовых машинах ниже
+  if(p.st==="dl"||p.roof)return; // курьеры — в фиолетовых машинах ниже
   const f=new THREE.Group();const body=new THREE.Mesh(new THREE.CylinderGeometry(.25,.32,.8,10),M(p.st==="br"?"#e0b46a":s.color));body.position.y=.4;
   const head=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),M("#f2d2b6"));head.position.y=1;f.add(body,head);
   f.children.forEach(c=>c.castShadow=true);f.scale.setScalar(.6);scene.add(f);people.push({f,s,a:i*1.7,st:p.st})});
