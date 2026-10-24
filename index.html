@@ -195,7 +195,7 @@ function sedan(){const v=new THREE.Group(),C="#6a3fa5";
   const glass=new THREE.Mesh(new THREE.BoxGeometry(1.08,.24,.87),M("#cfd8ea"));glass.position.set(-.1,.93,0);v.add(body,cab,glass);
   [[.62,.47],[.62,-.47],[-.62,.47],[-.62,-.47]].forEach(([x,z])=>{const w=new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,.12,12),M("#222428"));w.rotation.x=Math.PI/2;w.position.set(x,.2,z);v.add(w)});
   v.children.forEach(m=>m.castShadow=true);v.scale.setScalar(.6);scene.add(v);return v}
-DATA.stores.forEach(s=>{for(let k=0;k<2;k++)vans.push({v:sedan(),s,a:rnd(0,6.28),r:rnd(3,7),t:rnd(0,1),sp:rnd(.05,.09),trip:-1})});
+DATA.stores.forEach(s=>{for(let k=0;k<2;k++)vans.push({v:sedan(),s,a:rnd(0,6.28),r:rnd(3,7),t:rnd(0,1),sp:rnd(.07,.12),trip:-1})});
 
 // события: клиент заходит в магазин → Order; поставщик подъезжает → Invoice
 const fx=[];let orderNo=0,invoiceNo=0;
@@ -251,8 +251,8 @@ function frame(){const dt=clock.getDelta(),t=clock.elapsedTime;
   DATA.stores.forEach(s=>{const o=storeObjs[s.id];const h=1.5+s.rev/max*3;o.h+=(h-o.h)*0.05;
     o.bar.scale.set(o.h,1,o.h);o.pin.position.set(0,4+Math.sin(t*2+s.x)*0.25,0);
     o.ring.material.opacity=selected===s.id?0.6+Math.sin(t*4)*0.3:Math.max(0,o.ring.material.opacity-dt)});
-  people.forEach(p=>{const a=p.a+(p.st==="on"&&!reduce?t*0.4:0);p.f.position.set(p.s.x+Math.cos(a)*1.9,0,p.s.z+Math.sin(a)*1.9+0.3)});
-  vans.forEach(v=>{const T=v.t+(reduce?0:t*v.sp),trip=Math.floor(T),ph=T-trip;
+  people.forEach(p=>{const a=p.a+(p.st==="on"?t*0.4:0);p.f.position.set(p.s.x+Math.cos(a)*1.9,0,p.s.z+Math.sin(a)*1.9+0.3)});
+  vans.forEach(v=>{const T=v.t+t*v.sp,trip=Math.floor(T),ph=T-trip;
     if(trip!==v.trip){v.trip=trip;v.a=rnd(0,6.28);v.r=rnd(3,7)} // новый адрес на каждую поездку
     const out=ph<.45,k=out?ph/.45:ph<.55?1:1-(ph-.55)/.45,d=.8+k*v.r;
     v.v.position.set(v.s.x+Math.cos(v.a)*d,0,v.s.z+Math.sin(v.a)*d);v.v.rotation.y=-v.a+(out?0:Math.PI)});
