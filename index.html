@@ -66,7 +66,7 @@ h2{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
     <div class="kpi"><span>Средний чек</span><b id="kAvg">$0</b></div>
     <div class="kpi"><span>На смене</span><b id="kStaff">0</b></div>
   </div>
-  <div><h2>Магазины · клик — фокус на карте</h2><div class="list" id="stores"></div></div>
+  <div><h2>Магазины · клик — фокус на карте</h2><p style="margin:0 0 8px;font-size:11px;color:var(--muted)">Карта: тяните — сдвиг, правая кнопка или Shift — поворот, колесо — масштаб</p><div class="list" id="stores"></div></div>
   <div><h2 id="staffTitle">Сегодня работают</h2><div class="staff" id="staff"></div></div>
 </aside>
 <div class="feed" id="feed"></div>
@@ -189,7 +189,7 @@ function truck(s,amt){const v=new THREE.Group();const c=new THREE.Mesh(new THREE
     v.rotation.y+=Math.PI;fx.push({walk:v,from:to,to:from,t:-3,dur:5,done:()=>scene.remove(v)})}})}
 
 // камера: изометрия с медленным облётом
-let angle=1.9,target=new THREE.Vector3(-3,0,-2),zoom=62,baseZoom=62,lastTouch=0,moved=0;
+let angle=1.9,target=new THREE.Vector3(-3,0,-2),zoom=62,baseZoom=62,lastTouch=0,moved=0,pan=new THREE.Vector3();
 // управление: колесо/щипок — зум, перетаскивание — поворот, кнопки +/−/⌂
 const setZoom=z=>{baseZoom=Math.max(8,Math.min(120,z));lastTouch=Date.now()};
 canvas.addEventListener("wheel",e=>{e.preventDefault();setZoom(baseZoom*(e.deltaY>0?1.1:0.9))},{passive:false});
@@ -197,11 +197,15 @@ const ptrs=new Map();let pinch=0;
 canvas.addEventListener("pointerdown",e=>{canvas.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;canvas.style.cursor="grabbing"});
 canvas.addEventListener("pointermove",e=>{const p=ptrs.get(e.pointerId);if(!p)return;
   if(ptrs.size===2){const [a,b]=[...ptrs.values()];const d0=Math.hypot(a.x-b.x,a.y-b.y);p.x=e.clientX;p.y=e.clientY;const d1=Math.hypot(a.x-b.x,a.y-b.y);if(d0)setZoom(baseZoom*d0/d1);moved+=10;return}
-  const dx=e.clientX-p.x;angle+=dx*0.006;moved+=Math.abs(dx)+Math.abs(e.clientY-p.y);p.x=e.clientX;p.y=e.clientY;lastTouch=Date.now()});
+  const dx=e.clientX-p.x,dy=e.clientY-p.y;
+  if(e.buttons&2||e.shiftKey)angle+=dx*0.006; // правая кнопка или Shift — поворот
+  else{const u=zoom/innerHeight,c=Math.cos(angle),s=Math.sin(angle);pan.x+=-s*dx*u-c*dy*u*1.6;pan.z+=c*dx*u-s*dy*u*1.6} // левая — сдвиг карты
+  moved+=Math.abs(dx)+Math.abs(dy);p.x=e.clientX;p.y=e.clientY;lastTouch=Date.now()});
+canvas.addEventListener("contextmenu",e=>e.preventDefault());
 const up=e=>{ptrs.delete(e.pointerId);canvas.style.cursor="grab"};
 canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);
 $("zIn").onclick=()=>setZoom(baseZoom*0.75);$("zOut").onclick=()=>setZoom(baseZoom/0.75);
-$("zHome").onclick=()=>{selected=null;baseZoom=62;lastTouch=0;render()};
+$("zHome").onclick=()=>{selected=null;baseZoom=62;pan.set(0,0,0);lastTouch=0;render()};
 function resize(){const w=innerWidth,h=innerHeight,a=w/h;renderer.setSize(w,h,false);
   const z=w<640?zoom*1.25:zoom;Object.assign(cam,{left:-z*a/2,right:z*a/2,top:z/2,bottom:-z/2});cam.updateProjectionMatrix()}
 addEventListener("resize",resize);resize();
@@ -216,8 +220,8 @@ canvas.addEventListener("click",e=>{if(moved>6)return;mouse.set(e.clientX/innerW
 const clock=new THREE.Clock();
 function frame(){const dt=clock.getDelta(),t=clock.elapsedTime;
   if(!reduce&&!ptrs.size&&Date.now()-lastTouch>8000)angle+=dt*0.04;
-  const tg=selected?new THREE.Vector3(byId[selected].x,0,byId[selected].z):new THREE.Vector3(-3,0,-2);
-  target.lerp(tg,0.04);zoom+=((selected?Math.min(baseZoom,16):baseZoom)-zoom)*0.15;resize();
+  const tg=selected?new THREE.Vector3(byId[selected].x,0,byId[selected].z):new THREE.Vector3(-3,0,-2);tg.add(pan);
+  target.lerp(tg,ptrs.size?0.35:0.06);zoom+=((selected?Math.min(baseZoom,16):baseZoom)-zoom)*0.15;resize();
   cam.position.set(target.x+Math.cos(angle)*60,48,target.z+Math.sin(angle)*60);cam.lookAt(target);
   const max=Math.max(...DATA.stores.map(s=>s.rev));
   DATA.stores.forEach(s=>{const o=storeObjs[s.id];const h=1.5+s.rev/max*3;o.h+=(h-o.h)*0.05;
@@ -244,7 +248,7 @@ function render(){
   $("staffTitle").textContent=selected?"Смена · "+byId[selected].name:"Сегодня работают";
   $("staff").innerHTML=list.map(p=>`<div class="person"><span class="av" style="background:${byId[p.store].color}">${p.name[0]}</span><span>${p.name} <small style="color:var(--muted)">${p.role} · ${byId[p.store].name}</small></span><em class="${p.st==="on"?"on":p.st==="br"?"br":"dl"}">${ST[p.st]}</em></div>`).join("");
 }
-function select(id){selected=selected===id?null:id;render()}
+function select(id){selected=selected===id?null:id;pan.set(0,0,0);render()}
 $("stores").addEventListener("click",e=>{const b=e.target.closest(".store");if(b)select(b.dataset.id)});
 
 // симуляция новых продаж (в реальной версии — опрос таблицы раз в N минут)
