@@ -97,7 +97,7 @@ const DATA={
   plan:9000,
   stores:[
     {id:"lv",name:"Lakeview",addr:"Lakeview, Chicago",lat:41.946,lon:-87.652,color:"#d6457a",rev:2410,orders:34,ly:9},
-    {id:"lp",name:"Lincoln Square",addr:"Lincoln Square, Chicago",lat:41.969,lon:-87.686,color:"#7b5cd6",rev:1980,orders:27,ly:11},
+    {id:"lp",name:"Lincoln",addr:"Lincoln Square, Chicago",lat:41.969,lon:-87.686,color:"#7b5cd6",rev:1980,orders:27,ly:11},
     {id:"df",name:"Deerfield",addr:"Deerfield, IL",lat:42.171,lon:-87.845,color:"#3f9a6b",rev:1460,orders:19,ly:9},
     {id:"sb",name:"Schaumburg",addr:"Schaumburg, IL",lat:42.033,lon:-88.083,color:"#e0912f",rev:1720,orders:23,ly:9}
   ],
@@ -198,22 +198,15 @@ function sedan(){const v=new THREE.Group(),C="#6a3fa5";
   const glass=new THREE.Mesh(new THREE.BoxGeometry(1.08,.24,.87),M("#cfd8ea"));glass.position.set(-.1,.93,0);v.add(body,cab,glass);
   [[.62,.47],[.62,-.47],[-.62,.47],[-.62,-.47]].forEach(([x,z])=>{const w=new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,.12,12),M("#222428"));w.rotation.x=Math.PI/2;w.position.set(x,.2,z);v.add(w)});
   v.children.forEach(m=>m.castShadow=true);v.scale.setScalar(.6);scene.add(v);return v}
-DATA.stores.forEach(s=>{for(let k=0;k<2;k++)vans.push({v:sedan(),s,a:rnd(0,6.28),r:rnd(3,7),t:rnd(0,1),sp:rnd(.07,.12),trip:-1})});
+DATA.stores.slice(0,3).forEach(s=>vans.push({v:sedan(),s,a:rnd(0,6.28),r:rnd(3,7),t:rnd(0,1),sp:rnd(.07,.12),trip:-1})); // 3 машины доставки
 
-// события: клиент заходит в магазин → Order; поставщик подъезжает → Invoice
-const fx=[];let orderNo=0,invoiceNo=0;
+// события: клиент заходит в магазин → Order
+const fx=[];let orderNo=0;
 function bubble(text,s,color){const sp=label(text,s.x,s.z,3.2,{bg:color,color:"#ffffff",k:2.4,px:30,weight:700});sp.material.opacity=0;fx.push({sp,t:0,y:3.2})}
 function figure(color){const f=new THREE.Group();const b=new THREE.Mesh(new THREE.CylinderGeometry(.25,.32,.8,10),M(color));b.position.y=.4;
   const h=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),M("#f2d2b6"));h.position.y=1;f.add(b,h);f.scale.setScalar(.6);scene.add(f);return f}
 function walker(s,amt){const f=figure("#2f3a52"),a=rnd(0,6.28);
   fx.push({walk:f,from:[s.x+Math.cos(a)*3.5,s.z+Math.sin(a)*3.5],to:[s.x,s.z],t:0,dur:3,done:()=>{scene.remove(f);completeOrder(s,amt)}})}
-function truck(s,amt){const v=new THREE.Group();const c=new THREE.Mesh(new THREE.BoxGeometry(2.2,1.3,1.1),M("#ffffff"));c.position.y=.85;
-  const cab=new THREE.Mesh(new THREE.BoxGeometry(.8,1,1.1),M("#2f3a52"));cab.position.set(1.4,.7,0);v.add(c,cab);v.children.forEach(m=>m.castShadow=true);v.scale.setScalar(.8);scene.add(v);
-  const a=rnd(0,6.28),from=[s.x+Math.cos(a)*14,s.z+Math.sin(a)*14],to=[s.x+Math.cos(a)*1.8,s.z+Math.sin(a)*1.8];
-  v.rotation.y=-Math.atan2(to[1]-from[1],to[0]-from[0]);
-  fx.push({walk:v,from,to,t:0,dur:5,done:()=>{invoiceNo++;const sup="Supplier "+(1+Math.floor(Math.random()*3));
-    bubble(`${sup} · Invoice ${invoiceNo} · ${money(amt)}`,s,"#2f3a52");toast(`${sup} → ${s.name} · Invoice ${invoiceNo} · <b>${money(amt)}</b>`);
-    v.rotation.y+=Math.PI;fx.push({walk:v,from:to,to:from,t:-3,dur:5,done:()=>scene.remove(v)})}})}
 
 // камера: изометрия с медленным облётом
 let angle=1.9,target=new THREE.Vector3(-3,0,-2),zoom=62,baseZoom=62,lastTouch=0,moved=0,pan=new THREE.Vector3();
@@ -287,8 +280,7 @@ function completeOrder(s,amt){s.rev+=amt;s.orders++;orderNo++;render();
   bubble(`Order ${orderNo} · ${money(amt)}`,s,s.color);toast(`Order ${orderNo} · ${s.name} · <b>+${money(amt)}</b>`)}
 const pick=()=>DATA.stores[Math.floor(Math.random()*DATA.stores.length)];
 function sale(){walker(pick(),Math.round(rnd(35,160)));setTimeout(sale,rnd(4000,8000))}
-function supply(){truck(pick(),Math.round(rnd(6,15))*100);setTimeout(supply,rnd(12000,20000))}
-setTimeout(sale,1500);setTimeout(supply,5000);
+setTimeout(sale,1500);
 function tick(){$("clock").textContent="Chicago · "+new Date().toLocaleTimeString("ru-RU",{timeZone:"America/Chicago",hour:"2-digit",minute:"2-digit"})}
 tick();setInterval(tick,10000);render();
 </script>
