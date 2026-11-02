@@ -45,11 +45,14 @@ h2{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
 .av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700;flex:none}
 .person em{margin-left:auto;font-style:normal;font-size:11px;padding:2px 7px;border-radius:999px}
 .on{background:#dff2e7;color:#24704a}.br{background:#fbeccf;color:#8a5a12}.dl{background:#f9dbe6;color:#9c2a55}
+.now{position:fixed;top:calc(16px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:2;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 16px;box-shadow:0 2px 8px rgba(0,0,0,.06);display:flex;gap:12px;align-items:baseline;white-space:nowrap}
+.now b{font-family:var(--mono);font-size:22px;font-variant-numeric:tabular-nums}
+.now span{font-size:13px;color:var(--muted)}
 .feed{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px;align-items:flex-end;pointer-events:none}
 .toast{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.08);animation:in .4s ease}
 .toast b{font-family:var(--mono);color:var(--rose)}
 @keyframes in{from{transform:translateY(10px);opacity:0}}
-@media (max-width:640px){.panel{top:auto;height:46%;width:auto;right:max(16px,env(safe-area-inset-right,0px))}.feed{bottom:auto;top:calc(16px + env(safe-area-inset-top,0px));right:auto;left:max(16px,env(safe-area-inset-left,0px));align-items:flex-start}}
+@media (max-width:640px){.now{top:calc(64px + env(safe-area-inset-top,0px))}.now b{font-size:18px}.panel{top:auto;height:46%;width:auto;right:max(16px,env(safe-area-inset-right,0px))}.feed{bottom:auto;top:calc(16px + env(safe-area-inset-top,0px));right:auto;left:max(16px,env(safe-area-inset-left,0px));align-items:flex-start}}
 @media (prefers-reduced-motion:reduce){.live,.toast{animation:none}}
 </style>
 
@@ -87,6 +90,7 @@ h2{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
   <div><h2>Магазины · клик — фокус на карте</h2><p style="margin:0 0 8px;font-size:11px;color:var(--muted)">Карта: тяните — сдвиг, правая кнопка или Shift — поворот, колесо — масштаб</p><div class="list" id="stores"></div></div>
   <div><h2 id="staffTitle">Сегодня работают</h2><div class="staff" id="staff"></div></div>
 </aside>
+<div class="now" aria-live="off"><b id="nowTime">—</b><span id="nowDate">—</span></div>
 <div class="feed" id="feed"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -169,10 +173,8 @@ const storeObjs={};
 DATA.stores.forEach(s=>{
   const g=new THREE.Group();g.position.set(s.x,0,s.z);g.scale.setScalar(0.55);scene.add(g);
   label(s.name,s.x,s.z,s.ly,{bg:"#ffffff",color:s.color,k:2.4,weight:700});
-  // флорист на крыше + имя
-  const fl=DATA.staff.find(p=>p.roof&&p.store===s.id);
-  if(fl){const f=figure(s.color);scene.remove(f);f.scale.setScalar(1.4);f.position.set(0,2.8,0);g.add(f);
-    label(fl.name,s.x,s.z,2.9,{bg:s.color,color:"#ffffff",k:1.5,weight:700})}
+  // кто сейчас в магазине — фигурка на крыше + имена (обновляется из Supabase)
+  const fig=figure(s.color);scene.remove(fig);fig.scale.setScalar(1.4);fig.position.set(0,2.8,0);fig.visible=false;g.add(fig);
   const b=new THREE.Mesh(new THREE.BoxGeometry(5,2.6,4),M("#ffffff"));b.position.y=1.3;b.castShadow=b.receiveShadow=true;g.add(b);
   const aw=new THREE.Mesh(new THREE.BoxGeometry(5.2,0.3,1.2),M(s.color));aw.position.set(0,2,2.4);g.add(aw);
   const roof=new THREE.Mesh(new THREE.BoxGeometry(5,0.2,4),M(s.color));roof.position.y=2.7;g.add(roof);
@@ -181,16 +183,14 @@ DATA.stores.forEach(s=>{
   const pin=new THREE.Mesh(new THREE.SphereGeometry(0.55,16,12),M(s.color));pin.visible=false;g.add(pin);
   const ring=new THREE.Mesh(new THREE.RingGeometry(3.4,3.8,40),new THREE.MeshBasicMaterial({color:s.color,transparent:true,opacity:0}));
   ring.rotation.x=-Math.PI/2;ring.position.y=0.05;g.add(ring);
-  storeObjs[s.id]={g,bar,pin,ring,h:1,body:b};
+  storeObjs[s.id]={g,bar,pin,ring,h:1,body:b,fig,tag:null};
 });
 
-// сотрудники — фигурки у своих магазинов; курьеры — фургоны
+function updateRoofs(){DATA.stores.forEach(s=>{const o=storeObjs[s.id];
+  const here=DATA.staff.filter(p=>p.store===s.id&&p.st!=="dl").map(p=>p.name);
+  o.fig.visible=here.length>0;if(o.tag){scene.remove(o.tag);o.tag=null}
+  if(here.length)o.tag=label(here.join(", "),s.x,s.z,2.9,{bg:s.color,color:"#ffffff",k:1.5,weight:700})})}
 const people=[],vans=[];
-DATA.staff.forEach((p,i)=>{const s=byId[p.store];
-  if(p.st==="dl"||p.roof)return; // курьеры — в фиолетовых машинах ниже
-  const f=new THREE.Group();const body=new THREE.Mesh(new THREE.CylinderGeometry(.25,.32,.8,10),M(p.st==="br"?"#e0b46a":s.color));body.position.y=.4;
-  const head=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),M("#f2d2b6"));head.position.y=1;f.add(body,head);
-  f.children.forEach(c=>c.castShadow=true);f.scale.setScalar(.6);scene.add(f);people.push({f,s,a:i*1.7,st:p.st})});
 // доставка: фиолетовые седаны выезжают из магазина к клиенту и возвращаются
 function sedan(){const v=new THREE.Group(),C="#6a3fa5";
   const body=new THREE.Mesh(new THREE.BoxGeometry(2,.5,.95),M(C));body.position.y=.45;
@@ -200,13 +200,11 @@ function sedan(){const v=new THREE.Group(),C="#6a3fa5";
   v.children.forEach(m=>m.castShadow=true);v.scale.setScalar(.6);scene.add(v);return v}
 DATA.stores.slice(0,3).forEach(s=>vans.push({v:sedan(),s,a:rnd(0,6.28),r:rnd(3,7),t:rnd(0,1),sp:rnd(.07,.12),trip:-1})); // 3 машины доставки
 
-// события: клиент заходит в магазин → Order
+// события: новый заказ → сумма всплывает над магазином
 const fx=[];let orderNo=0;
 function bubble(text,s,color){const sp=label(text,s.x,s.z,3.2,{bg:color,color:"#ffffff",k:2.4,px:30,weight:700});sp.material.opacity=0;fx.push({sp,t:0,y:3.2})}
 function figure(color){const f=new THREE.Group();const b=new THREE.Mesh(new THREE.CylinderGeometry(.25,.32,.8,10),M(color));b.position.y=.4;
   const h=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),M("#f2d2b6"));h.position.y=1;f.add(b,h);f.scale.setScalar(.6);scene.add(f);return f}
-function walker(s,amt){const f=figure("#2f3a52"),a=rnd(0,6.28);
-  fx.push({walk:f,from:[s.x+Math.cos(a)*3.5,s.z+Math.sin(a)*3.5],to:[s.x,s.z],t:0,dur:3,done:()=>{scene.remove(f);completeOrder(s,amt)}})}
 
 // камера: изометрия с медленным облётом
 let angle=1.9,target=new THREE.Vector3(-3,0,-2),zoom=62,baseZoom=62,lastTouch=0,moved=0,pan=new THREE.Vector3();
@@ -273,14 +271,31 @@ function render(){
 function select(id){selected=selected===id?null:id;pan.set(0,0,0);render()}
 $("stores").addEventListener("click",e=>{const b=e.target.closest(".store");if(b)select(b.dataset.id)});
 
+// ===== КТО СЕЙЧАС В МАГАЗИНЕ: Supabase =====
+// Заполнить url и anon-ключ проекта. Ожидаемые поля строки: name, role, store (lv|lp|df|sb или название магазина), status (on|break|delivery)
+const SUPABASE={url:"",key:"",table:"staff_now"};
+let staffSrc="Сотрудники: демо";
+async function loadStaff(){if(!SUPABASE.url||!SUPABASE.key)return;
+  try{const r=await fetch(`${SUPABASE.url}/rest/v1/${SUPABASE.table}?select=*`,{headers:{apikey:SUPABASE.key,Authorization:"Bearer "+SUPABASE.key}});
+    if(!r.ok)throw new Error(r.status);const rows=await r.json();
+    const sid=v=>byId[v]?v:(DATA.stores.find(s=>s.name.toLowerCase()===String(v||"").toLowerCase())||{}).id;
+    const st={on:"on",break:"br",br:"br",delivery:"dl",dl:"dl"};
+    DATA.staff=rows.map(x=>({name:x.name,role:x.role||"Сотрудник",store:sid(x.store),st:st[x.status]||"on"})).filter(p=>p.store);
+    staffSrc="Сотрудники: Supabase · "+new Date().toLocaleTimeString("ru-RU",{timeZone:"America/Chicago",hour:"2-digit",minute:"2-digit"});
+    updateRoofs();render()}catch(e){staffSrc="Supabase недоступен — показаны последние данные"}}
+updateRoofs();loadStaff();setInterval(loadStaff,60000);
+
 // симуляция новых продаж (в реальной версии — опрос таблицы раз в N минут)
 function toast(html){const el=document.createElement("div");el.className="toast";el.innerHTML=html;
   $("feed").prepend(el);while($("feed").children.length>3)$("feed").lastChild.remove();setTimeout(()=>el.remove(),6000)}
 function completeOrder(s,amt){s.rev+=amt;s.orders++;orderNo++;render();
   bubble(`Order ${orderNo} · ${money(amt)}`,s,s.color);toast(`Order ${orderNo} · ${s.name} · <b>+${money(amt)}</b>`)}
 const pick=()=>DATA.stores[Math.floor(Math.random()*DATA.stores.length)];
-function sale(){walker(pick(),Math.round(rnd(35,160)));setTimeout(sale,rnd(4000,8000))}
+function sale(){completeOrder(pick(),Math.round(rnd(35,160)));setTimeout(sale,rnd(4000,8000))}
 setTimeout(sale,1500);
-function tick(){$("clock").textContent="Chicago · "+new Date().toLocaleTimeString("ru-RU",{timeZone:"America/Chicago",hour:"2-digit",minute:"2-digit"})}
-tick();setInterval(tick,10000);render();
+function tick(){const d=new Date(),tz={timeZone:"America/Chicago"};
+  $("nowTime").textContent=d.toLocaleTimeString("ru-RU",{...tz,hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  $("nowDate").textContent=d.toLocaleDateString("ru-RU",{...tz,weekday:"long",day:"numeric",month:"long",year:"numeric"})+" · Chicago";
+  $("clock").textContent=staffSrc}
+tick();setInterval(tick,1000);render();
 </script>
