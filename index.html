@@ -195,7 +195,7 @@ DATA.stores.forEach(s=>{
 function updateRoofs(){DATA.stores.forEach(s=>{const o=storeObjs[s.id];
   const here=DATA.staff.filter(p=>p.store===s.id&&p.st!=="dl").map(p=>p.name);
   o.fig.visible=here.length>0;if(o.tag){scene.remove(o.tag);o.tag=null}
-  if(here.length)o.tag=label(here.join(", "),s.x,s.z,2.9,{bg:s.color,color:"#ffffff",k:1.5,weight:700})})}
+  if(here.length)o.tag=label(here.join(", "),s.x,s.z,3.4,{bg:s.color,color:"#ffffff",k:2.4,weight:700})})}
 const people=[],vans=[];
 // доставка: фиолетовые седаны выезжают из магазина к клиенту и возвращаются
 function sedan(){const v=new THREE.Group(),C="#6a3fa5";
