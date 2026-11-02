@@ -79,7 +79,7 @@ h2{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
 <aside class="panel">
   <div>
     <h1>Luna Flowers · Chicago</h1>
-    <div class="sub"><span class="live"></span><span id="clock">—</span><span class="demo">ДЕМО-ДАННЫЕ</span></div>
+    <div class="sub"><span class="live"></span><span id="clock">—</span><span class="demo">ВЫРУЧКА — ДЕМО</span></div>
   </div>
   <div class="kpis">
     <div class="kpi"><span>Выручка сегодня</span><b id="kRev">$0</b><div class="bar"><i id="kPlan" style="width:0"></i></div></div>
@@ -88,7 +88,7 @@ h2{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute
     <div class="kpi"><span>На смене</span><b id="kStaff">0</b></div>
   </div>
   <div><h2>Магазины · клик — фокус на карте</h2><p style="margin:0 0 8px;font-size:11px;color:var(--muted)">Карта: тяните — сдвиг, правая кнопка или Shift — поворот, колесо — масштаб</p><div class="list" id="stores"></div></div>
-  <div><h2 id="staffTitle">Сегодня работают</h2><div class="staff" id="staff"></div></div>
+  <div><h2 id="staffTitle">Сейчас в магазинах</h2><div class="staff" id="staff"></div></div>
 </aside>
 <div class="now" aria-live="off"><b id="nowTime">—</b><span id="nowDate">—</span></div>
 <div class="feed" id="feed"></div>
@@ -105,11 +105,7 @@ const DATA={
     {id:"df",name:"Deerfield",addr:"Deerfield, IL",lat:42.171,lon:-87.845,color:"#3f9a6b",rev:1460,orders:19,ly:9},
     {id:"sb",name:"Schaumburg",addr:"Schaumburg, IL",lat:42.033,lon:-88.083,color:"#e0912f",rev:1720,orders:23,ly:9}
   ],
-  staff:[
-    {name:"Karina",role:"Флорист",store:"lv",st:"on",roof:true},{name:"Milana",role:"Флорист",store:"lp",st:"on",roof:true},
-    {name:"Gina",role:"Флорист",store:"df",st:"on",roof:true},{name:"Meka",role:"Флорист",store:"sb",st:"on",roof:true},
-    {name:"Timur",role:"Курьер",store:"df",st:"dl"},{name:"Ruslan",role:"Курьер",store:"lv",st:"dl"}
-  ]
+  staff:[] // заполняется из Supabase (кто сейчас на смене)
 };
 DATA.stores.forEach(s=>{[s.x,s.z]=P(s.lat,s.lon)});
 const ST={on:"на смене",br:"перерыв",dl:"доставка"};
@@ -265,24 +261,23 @@ function render(){
   const sorted=[...DATA.stores].sort((a,b)=>b.rev-a.rev);
   $("stores").innerHTML=sorted.map(s=>`<button class="store${selected===s.id?" sel":""}" data-id="${s.id}"><span class="dot" style="background:${s.color}"></span><span>${s.name}<small>${s.addr} · ${s.orders} заказов</small></span><b>${money(s.rev)}</b></button>`).join("");
   const list=selected?DATA.staff.filter(p=>p.store===selected):DATA.staff;
-  $("staffTitle").textContent=selected?"Смена · "+byId[selected].name:"Сегодня работают";
+  $("staffTitle").textContent=selected?"Сейчас в магазине · "+byId[selected].name:"Сейчас в магазинах";
   $("staff").innerHTML=list.map(p=>`<div class="person"><span class="av" style="background:${byId[p.store].color}">${p.name[0]}</span><span>${p.name} <small style="color:var(--muted)">${p.role} · ${byId[p.store].name}</small></span><em class="${p.st==="on"?"on":p.st==="br"?"br":"dl"}">${ST[p.st]}</em></div>`).join("");
 }
 function select(id){selected=selected===id?null:id;pan.set(0,0,0);render()}
 $("stores").addEventListener("click",e=>{const b=e.target.closest(".store");if(b)select(b.dataset.id)});
 
-// ===== КТО СЕЙЧАС В МАГАЗИНЕ: Supabase =====
-// Заполнить url и anon-ключ проекта. Ожидаемые поля строки: name, role, store (lv|lp|df|sb или название магазина), status (on|break|delivery)
-const SUPABASE={url:"",key:"",table:"staff_now"};
-let staffSrc="Сотрудники: демо";
-async function loadStaff(){if(!SUPABASE.url||!SUPABASE.key)return;
-  try{const r=await fetch(`${SUPABASE.url}/rest/v1/${SUPABASE.table}?select=*`,{headers:{apikey:SUPABASE.key,Authorization:"Bearer "+SUPABASE.key}});
-    if(!r.ok)throw new Error(r.status);const rows=await r.json();
-    const sid=v=>byId[v]?v:(DATA.stores.find(s=>s.name.toLowerCase()===String(v||"").toLowerCase())||{}).id;
-    const st={on:"on",break:"br",br:"br",delivery:"dl",dl:"dl"};
-    DATA.staff=rows.map(x=>({name:x.name,role:x.role||"Сотрудник",store:sid(x.store),st:st[x.status]||"on"})).filter(p=>p.store);
-    staffSrc="Сотрудники: Supabase · "+new Date().toLocaleTimeString("ru-RU",{timeZone:"America/Chicago",hour:"2-digit",minute:"2-digit"});
-    updateRoofs();render()}catch(e){staffSrc="Supabase недоступен — показаны последние данные"}}
+// ===== КТО СЕЙЧАС В МАГАЗИНЕ: Supabase (функция dashboard-presence, только чтение открытых смен) =====
+const PRESENCE_URL="https://kwocegmdcmocamxzcowq.supabase.co/functions/v1/dashboard-presence";
+const NAMES={}; // ник → имя для показа, напр. {reyaprotea:"Rabia"}; без записи показывается ник
+let staffSrc="Сотрудники: загрузка…";
+async function loadStaff(){
+  try{const r=await fetch(PRESENCE_URL,{cache:"no-store"});if(!r.ok)throw new Error(r.status);const d=await r.json();
+    const sid=v=>(DATA.stores.find(s=>s.name.toLowerCase()===String(v||"").toLowerCase())||{}).id;
+    const hm=t=>new Date(t).toLocaleTimeString("ru-RU",{timeZone:"America/Chicago",hour:"2-digit",minute:"2-digit"});
+    DATA.staff=d.staff.map(x=>({name:NAMES[x.username]||x.username,role:"с "+hm(x.since),store:sid(x.store),st:"on"})).filter(p=>p.store);
+    staffSrc="Смены: Supabase · обновлено "+hm(d.now);
+    updateRoofs();render()}catch(e){staffSrc="Смены: нет связи с Supabase"}}
 updateRoofs();loadStaff();setInterval(loadStaff,60000);
 
 // симуляция новых продаж (в реальной версии — опрос таблицы раз в N минут)
